@@ -2,6 +2,7 @@ const { ipcMain, app, BrowserWindow } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const https = require('https');
+const crypto = require('crypto');
 const http = require('http');
 const { spawn, execFile } = require('child_process');
 const {
@@ -64,6 +65,17 @@ function fetchJson(url) {
             });
             res.on('error', reject);
         }).on('error', reject);
+    });
+}
+
+// Payoff: stream a file through SHA-256 (multi-GB safe).
+function sha256File(filePath) {
+    return new Promise((resolve, reject) => {
+        const hash = crypto.createHash('sha256');
+        fs.createReadStream(filePath)
+            .on('data', (chunk) => hash.update(chunk))
+            .on('error', reject)
+            .on('end', () => resolve(hash.digest('hex')));
     });
 }
 
@@ -245,6 +257,8 @@ async function downloadBinary(mainWindow) {
         const customUrl = CUSTOM_BINARIES[platformKey];
 
         let downloadUrl, zipName;
+        // Payoff: expected SHA-256 from GitHub's release-asset digest, when published.
+        let expectedSha256 = null;
 
         if (customUrl) {
             downloadUrl = customUrl;
@@ -287,6 +301,9 @@ async function downloadBinary(mainWindow) {
             }
             downloadUrl = chosen.browser_download_url;
             zipName = chosen.name;
+            if (typeof chosen.digest === 'string' && chosen.digest.startsWith('sha256:')) {
+                expectedSha256 = chosen.digest.slice('sha256:'.length).toLowerCase();
+            }
         }
 
         send({ phase: 'downloading', progress: 0 });
@@ -294,6 +311,18 @@ async function downloadBinary(mainWindow) {
         await downloadFile(downloadUrl, zipPath, (p) => {
             send({ phase: 'downloading', progress: p });
         });
+
+        // Payoff: verify the engine archive before extracting or executing anything from it.
+        const actualSha256 = await sha256File(zipPath);
+        if (expectedSha256) {
+            if (actualSha256 !== expectedSha256) {
+                fs.unlinkSync(zipPath);
+                throw new Error(`Checksum mismatch for ${zipName}: expected ${expectedSha256}, got ${actualSha256}. Download discarded.`);
+            }
+            console.log(`[local-ai] Verified ${zipName} sha256=${actualSha256}`);
+        } else {
+            console.warn(`[local-ai] No published checksum for ${zipName}; sha256=${actualSha256} (unverified)`);
+        }
 
         send({ phase: 'extracting', progress: 0.95 });
         await extractZip(zipPath, BIN_DIR);
