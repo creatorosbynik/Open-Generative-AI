@@ -2,6 +2,7 @@ const { app, BrowserWindow, shell, dialog } = require('electron');
 const path = require('path');
 const { register: registerLocalInference } = require('./lib/localInference');
 const { register: registerWan2gp } = require('./lib/wan2gpProvider');
+const { register: registerPayoffMode } = require('./lib/payoffMode');
 
 process.on('uncaughtException', (err) => {
     console.error('Uncaught exception:', err);
@@ -40,7 +41,7 @@ function createWindow() {
         ...(isMac ? { titleBarStyle: 'hiddenInset' } : {}),
         backgroundColor: '#0d0d0d',
         show: false,
-        title: 'Open Generative AI',
+        title: 'Payoff Studio',
     });
 
     const indexPath = path.join(__dirname, '../dist/index.html');
@@ -68,6 +69,8 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+    // Payoff: mode must be known (and the offline guard installed) before the UI loads.
+    registerPayoffMode();
     createWindow();
 
     try {

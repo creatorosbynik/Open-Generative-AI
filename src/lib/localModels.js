@@ -4,6 +4,40 @@
 //   - wan2gp: user-installed Wan2GP (local folder or remote MCP server)
 // Mirrors electron/lib/modelCatalog.js (sd.cpp) and electron/lib/wan2gpCatalog.js (wan2gp).
 export const LOCAL_MODEL_CATALOG = [
+    // ── Payoff: models already downloaded on Nikunj's PC (payoff-ai-gen\Wan2GP\ckpts) ──
+    {
+        id: 'wan2gp:z-image-turbo',
+        name: 'Z-Image Turbo (Wan2GP)',
+        description: 'Image — Z-Image Turbo 6B, 8 steps. Already on disk; nothing to download.',
+        type: 'image',
+        family: 'z-image',
+        provider: 'wan2gp',
+        modelType: 'z_image',
+        aspectRatios: ['1:1', '4:3', '3:4', '16:9', '9:16'],
+        tags: ['image', 'z-image', 'fast', 'on-disk'],
+    },
+    {
+        id: 'wan2gp:ltx25-distilled-nvfp4',
+        name: 'LTX-2.5 Distilled NVFP4 (video + sound)',
+        description: 'Video — LTX-2.5 22B distilled, 8 steps, 720p, generates synced audio. NVFP4 for RTX 50-series. Already on disk.',
+        type: 'video',
+        family: 'ltx',
+        provider: 'wan2gp',
+        modelType: 'ltx2_25_22B_distilled_nvfp4',
+        aspectRatios: ['16:9', '9:16', '1:1'],
+        tags: ['video', 'ltx', 'fast', 'audio', 'on-disk'],
+    },
+    {
+        id: 'wan2gp:wan21-t2v-14b',
+        name: 'Wan 2.1 14B (Text-to-Video)',
+        description: 'Video — Wan 2.1 14B text-to-video, 480p. Already on disk.',
+        type: 'video',
+        family: 'wan',
+        provider: 'wan2gp',
+        modelType: 't2v',
+        aspectRatios: ['16:9', '9:16', '1:1'],
+        tags: ['video', 'wan', 'text-to-video', 'on-disk'],
+    },
     // ── sd.cpp: Z-Image (Tongyi-MAI) ────────────────────────────────────────
     {
         id: 'z-image-turbo',

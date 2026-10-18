@@ -1,9 +1,22 @@
 import { SettingsModal } from './SettingsModal.js';
 import { t, getLang, setLang } from '../lib/i18n.js';
+import { getMode, setMode, canSwitchMode, LOCAL_PAGES } from '../lib/appMode.js';
 
 export function Header(navigate) {
     const header = document.createElement('header');
     header.className = 'w-full flex flex-col z-50 sticky top-0';
+    const mode = getMode();
+    const isLocal = mode === 'local';
+
+    // Payoff: a coloured strip so it's always obvious which world you're in.
+    const modeStrip = document.createElement('div');
+    modeStrip.className = isLocal
+        ? 'w-full py-1 text-center text-[11px] font-black tracking-widest bg-emerald-500 text-black'
+        : 'w-full py-1 text-center text-[11px] font-black tracking-widest bg-sky-500 text-black';
+    modeStrip.textContent = isLocal
+        ? 'LOCAL MODE · OFFLINE · ON-DEVICE MODELS ONLY · NOTHING LEAVES THIS PC'
+        : 'CLOUD MODE · MUAPI MODELS · USES CREDITS';
+    if (canSwitchMode()) header.appendChild(modeStrip);
 
 
     // 2. Main Navigation Bar
@@ -38,7 +51,8 @@ export function Header(navigate) {
         { label: t('nav.mcpcli'),  page: 'mcp-cli' },
     ];
 
-    items.forEach(({ label, page }, idx) => {
+    const visibleItems = isLocal ? items.filter(i => LOCAL_PAGES.includes(i.page)) : items;
+    visibleItems.forEach(({ label, page }, idx) => {
         const link = document.createElement('a');
         link.textContent = label;
         link.className = `hover:text-white transition-all cursor-pointer relative group ${idx === 0 ? 'text-white' : ''}`;
@@ -85,6 +99,26 @@ export function Header(navigate) {
     langBtn.title = currentLang === 'zh-CN' ? t('web.switchToEn') : t('web.switchToZh');
     langBtn.textContent = currentLang === 'zh-CN' ? 'EN' : '中文';
     langBtn.onclick = () => setLang(currentLang === 'zh-CN' ? 'en' : 'zh-CN');
+
+    // Payoff: Cloud / Local switch (desktop app only). Switching reloads the app
+    // so the two model worlds never mix.
+    if (canSwitchMode()) {
+        const switchWrap = document.createElement('div');
+        switchWrap.className = 'flex items-center rounded-lg border border-white/10 bg-white/5 p-0.5 text-[12px] font-black';
+        const makeOpt = (value, label, activeCls) => {
+            const b = document.createElement('button');
+            b.textContent = label;
+            b.title = value === 'local' ? 'On-device models only. Works offline.' : 'MuAPI cloud models. Needs your API key.';
+            b.className = mode === value
+                ? `px-3 py-1 rounded-md ${activeCls} text-black`
+                : 'px-3 py-1 rounded-md text-white/50 hover:text-white';
+            b.onclick = () => { if (mode !== value) setMode(value); };
+            return b;
+        };
+        switchWrap.appendChild(makeOpt('cloud', '☁ Cloud', 'bg-sky-500'));
+        switchWrap.appendChild(makeOpt('local', '⚡ Local', 'bg-emerald-500'));
+        rightPart.appendChild(switchWrap);
+    }
 
     rightPart.appendChild(langBtn);
     rightPart.appendChild(settingsBtn);

@@ -5,6 +5,7 @@ import {
     getMaxImagesForI2IModel
 } from '../lib/models.js';
 import { localAI, isLocalAIAvailable } from '../lib/localInferenceClient.js';
+import { isLocalMode } from '../lib/appMode.js';
 import { LOCAL_MODEL_CATALOG, getLocalModelById } from '../lib/localModels.js';
 import { ENHANCE_TAGS, QUICK_PROMPTS } from '../lib/promptUtils.js';
 import { AuthModal } from './AuthModal.js';
@@ -42,7 +43,14 @@ export function ImageStudio() {
     // sd.cpp uses type='sd1'|'sdxl'|'z-image'; Wan2GP image models use type='image'.
     // Wan2GP video models (type='video') are hidden from ImageStudio.
     const LOCAL_IMAGE_MODELS = LOCAL_MODEL_CATALOG.filter(m => m.type !== 'video');
-    let useLocalModel = false;
+    // Payoff: the app-wide Cloud / Local mode decides the model source; no per-studio mixing.
+    let useLocalModel = isLocalAIAvailable() && isLocalMode();
+    const showLocalLabel = () => {
+        if (!useLocalModel) return;
+        const lm = getLocalModelById(selectedLocalModel);
+        const label = document.getElementById('model-btn-label');
+        if (lm && label) label.textContent = lm.name;
+    };
     let selectedLocalModel = LOCAL_IMAGE_MODELS[0]?.id || null;
     let localGenProgress = 0; // 0–1
 
@@ -126,6 +134,7 @@ export function ImageStudio() {
                 selectedAr = getAspectRatiosForI2IModel(selectedModel)[0];
                 document.getElementById('model-btn-label').textContent = selectedModelName;
                 document.getElementById('ar-btn-label').textContent = selectedAr;
+                showLocalLabel();
                 const validResolutions = getResolutionsForI2IModel(selectedModel);
                 qualityBtn.style.display = validResolutions.length > 0 ? 'flex' : 'none';
                 if (validResolutions.length > 0) document.getElementById('quality-btn-label').textContent = validResolutions[0];
@@ -143,6 +152,7 @@ export function ImageStudio() {
             selectedAr = getAspectRatiosForModel(selectedModel)[0];
             document.getElementById('model-btn-label').textContent = selectedModelName;
             document.getElementById('ar-btn-label').textContent = selectedAr;
+            showLocalLabel();
             const t2iResolutions = getResolutionsForModel(selectedModel);
             qualityBtn.style.display = t2iResolutions.length > 0 ? 'flex' : 'none';
             if (t2iResolutions.length > 0) document.getElementById('quality-btn-label').textContent = t2iResolutions[0];
@@ -202,7 +212,7 @@ export function ImageStudio() {
 
     // Local / API source toggle (only shown in Electron)
     let localToggleBtn = null;
-    if (isLocalAIAvailable()) {
+    if (false) { // Payoff: per-studio toggle replaced by the app-wide Cloud / Local switch
         localToggleBtn = document.createElement('button');
         localToggleBtn.id = 'local-toggle-btn';
         localToggleBtn.className = 'flex items-center gap-1.5 px-3 py-2 rounded-xl transition-all border text-xs font-bold whitespace-nowrap';
@@ -234,6 +244,12 @@ export function ImageStudio() {
     controlsLeft.appendChild(modelBtn);
     controlsLeft.appendChild(arBtn);
     controlsLeft.appendChild(qualityBtn);
+    // Payoff: in Local mode, show the local model name from the start.
+    if (useLocalModel) {
+        const lm = getLocalModelById(selectedLocalModel);
+        const label = modelBtn.querySelector('#model-btn-label');
+        if (lm && label) label.textContent = lm.name;
+    }
     
     // Advanced options toggle button
     const advancedBtn = createControlBtn(`
@@ -246,6 +262,8 @@ export function ImageStudio() {
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="opacity-60 text-secondary"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
     `, t('common.tools'), 'tools-btn', t('image.toolsTooltip'));
     controlsLeft.appendChild(toolsBtn);
+    // Payoff: quick tools are cloud endpoints, so they are hidden in Local mode.
+    if (useLocalModel) toolsBtn.style.display = 'none';
     // Show quality button if the default model has quality/resolution options
     const _initResolutions = getResolutionsForModel(defaultModel.id);
     qualityBtn.style.display = _initResolutions.length > 0 ? 'flex' : 'none';

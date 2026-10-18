@@ -42,3 +42,9 @@ contextBridge.exposeInMainWorld('localAI', {
         return () => ipcRenderer.removeListener('local-ai:download-progress', listener);
     },
 });
+
+// Payoff Studio: Cloud / Local mode (switching reloads the window).
+contextBridge.exposeInMainWorld('payoffMode', {
+    get: () => ipcRenderer.sendSync('payoff-mode:get'),
+    set: (mode) => ipcRenderer.invoke('payoff-mode:set', mode),
+});

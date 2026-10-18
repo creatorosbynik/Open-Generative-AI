@@ -5,6 +5,7 @@ import { t, tf } from '../lib/i18n.js';
 import { createUploadPicker } from './UploadPicker.js';
 import { savePendingJob, removePendingJob, getPendingJobs } from '../lib/pendingJobs.js';
 import { localAI, isLocalAIAvailable } from '../lib/localInferenceClient.js';
+import { isLocalMode } from '../lib/appMode.js';
 import { isWan2gpModelId, getLocalModelById, localT2VModels, localI2VModels } from '../lib/localModels.js';
 
 // Promotes a wan2gp catalog entry (lib/localModels.js shape) into the
@@ -478,7 +479,13 @@ export function VideoStudio() {
             updateControlsForModel(selectedModel);
             textarea.placeholder = t('video.placeholder');
         };
-        controlsLeft.appendChild(localToggleBtn);
+        // Payoff: no per-studio toggle. The app-wide Cloud / Local mode picks the source;
+        // in Local mode switch to the Wan2GP list once the studio is on screen.
+        if (isLocalMode()) {
+            setTimeout(() => {
+                localToggleBtn.onclick({ stopPropagation() {} }).catch(err => console.error('[VideoStudio] local mode init failed:', err));
+            }, 0);
+        }
     }
 
     controlsLeft.appendChild(modelBtn);
@@ -1256,7 +1263,9 @@ export function VideoStudio() {
         // Local Wan2GP generations don't go through Muapi — skip the auth gate,
         // but refuse models the engine reported as unavailable.
         if (isLocal) {
-            if (!localAvailability.size) await refreshLocalAvailability();
+            // Payoff: always re-read engine status, so a Wan2GP folder set after this
+            // studio opened is picked up without restarting the app.
+            await refreshLocalAvailability();
             const status = localAvailability.get(selectedModel);
             if (status && !status.ready) {
                 showLocalError(status.unavailableReason);

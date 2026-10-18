@@ -4,6 +4,19 @@ Our fork of [Open Generative AI](https://github.com/Anil-matcha/Open-Generative-
 
 **The rule:** local first for previz, storyboards and hook tests, because it costs nothing and nothing leaves the PC. Use cloud (MuAPI) only for hero renders on flagship models.
 
+## Cloud / Local switch (desktop app)
+
+The desktop app has one switch in the top bar: **☁ Cloud | ⚡ Local**. Switching reloads the app, so the two never mix.
+
+| | ☁ Cloud mode (blue strip) | ⚡ Local mode (green strip) |
+|---|---|---|
+| Models | MuAPI only (Seedance, Veo, Kling, Nano Banana…) | On-device only: Z-Image, SDXL, Realistic Vision, Flux Dev, Qwen Image, Wan 2.1/2.2, LTX-2, Hunyuan |
+| Studios | Image, Video, Lip Sync, Cinema, Workflows, Agents, MCP | Image, Video |
+| Internet | Yes, needs your MuAPI key | **Blocked for the app window.** Prompts, uploads and outputs never leave the PC. Only model downloads (Settings → Local Models) use the network. |
+| Cost | MuAPI credits | ₹0 per generation |
+
+The web app (`Start-Payoff-Web.bat`) is always Cloud.
+
 ## Two apps, one repo
 
 | | Web app | Desktop app |

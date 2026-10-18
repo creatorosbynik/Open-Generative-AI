@@ -10,9 +10,14 @@ const MEDIA_EXTENSIONS = new Set(['.mp4', '.mkv', '.mov', '.webm', '.png', '.jpg
 const OUTPUT_CAP = 2 * 1024 * 1024; // keep the last 2 MB of console output
 
 function defaultPythonPath(dir, platform = process.platform) {
-    return platform === 'win32'
-        ? path.join(dir, 'venv', 'Scripts', 'python.exe')
-        : path.join(dir, 'venv', 'bin', 'python');
+    const inEnv = (env) => platform === 'win32'
+        ? path.join(dir, env, 'Scripts', 'python.exe')
+        : path.join(dir, env, 'bin', 'python');
+    // Payoff: newer Wan2GP installers (setup.py --env venv) create `env_venv`; older ones `venv`.
+    for (const env of ['env_venv', 'venv']) {
+        try { if (fs.existsSync(inEnv(env))) return inEnv(env); } catch (_) { /* keep looking */ }
+    }
+    return inEnv('venv');
 }
 
 function resolveInstall({ dir, python } = {}, platform = process.platform) {
