@@ -9,6 +9,6 @@ if not exist "node_modules" (
 )
 call npm run electron:build:win || (pause & exit /b 1)
 echo.
-echo Done. Run the installer in the "release" folder: Open Generative AI Setup 2.0.0.exe
+echo Done. Run the installer in the "release" folder: Payoff Studio Setup 2.0.0.exe
 explorer release
 pause
