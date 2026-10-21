@@ -1,16 +1,21 @@
 import './style.css';
 import { Header } from './components/Header.js';
 import { ImageStudio } from './components/ImageStudio.js';
+import { getMode, applyModeTheme, toggleMode, canSwitchMode, LOCAL_PAGES } from './lib/appMode.js';
 
 const app = document.querySelector('#app');
 let contentArea;
+let headerEl;
+let currentPage = 'image';
 
 // Keep all mounted page nodes so async generation survives tab switches
-const mountedPages = {};
+let mountedPages = {};
 
 // Router — show/hide instead of destroy
 function navigate(page) {
   if (!contentArea) return;
+  if (getMode() === 'local' && !LOCAL_PAGES.includes(page)) page = 'image';
+  currentPage = page;
 
   // Hide all existing pages
   Object.values(mountedPages).forEach(node => { node.style.display = 'none'; });
@@ -55,9 +60,15 @@ function navigate(page) {
   }
 }
 
+function renderHeader() {
+  const next = Header(navigate, () => currentPage);
+  if (headerEl) headerEl.replaceWith(next); else app.appendChild(next);
+  headerEl = next;
+}
+
+applyModeTheme();
 app.innerHTML = '';
-// Pass navigate to Header so links work
-app.appendChild(Header(navigate));
+renderHeader();
 
 contentArea = document.createElement('main');
 contentArea.id = 'content-area';
@@ -66,6 +77,25 @@ app.appendChild(contentArea);
 
 // Initial Route
 navigate('image');
+if (getMode() === 'local') window.localAI?.wan2gp?.warm?.().catch(() => {});
+
+// Payoff: Online / Offline switch without reloading the app.
+// Studios read the mode when they are built, so rebuild them; keep the same page if it exists in the new mode.
+window.addEventListener('payoff-mode-changed', () => {
+  const page = currentPage;
+  Object.values(mountedPages).forEach(node => node.remove());
+  mountedPages = {};
+  renderHeader();
+  navigate(page);
+});
+
+// Ctrl+Shift+M toggles Online / Offline.
+window.addEventListener('keydown', (e) => {
+  if (canSwitchMode() && e.ctrlKey && e.shiftKey && (e.key === 'M' || e.key === 'm')) {
+    e.preventDefault();
+    toggleMode();
+  }
+});
 
 // Event Listener for Navigation
 window.addEventListener('navigate', (e) => {

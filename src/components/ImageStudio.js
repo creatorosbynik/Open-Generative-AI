@@ -7,6 +7,8 @@ import {
 } from '../lib/models.js';
 import { localAI, isLocalAIAvailable } from '../lib/localInferenceClient.js';
 import { isLocalMode } from '../lib/appMode.js';
+import { createCostChip, bindCostChip, loadAllPrices, priceHint } from '../lib/pricing.js';
+import { createLookRow, applyLook } from '../lib/payoffLooks.js';
 import { LOCAL_MODEL_CATALOG, getLocalModelById } from '../lib/localModels.js';
 import { ENHANCE_TAGS, QUICK_PROMPTS } from '../lib/promptUtils.js';
 import { AuthModal } from './AuthModal.js';
@@ -60,6 +62,8 @@ export function ImageStudio() {
     let guidanceScale = 7.5;
     let steps = 25;
     let seed = -1;
+    let stepsTouched = false;     // Payoff: send steps/guidance only if the user changed them
+    let guidanceTouched = false;
     let showAdvanced = false;
     let selectedStyle = 'None';
     let batchCount = 1;
@@ -87,7 +91,7 @@ export function ImageStudio() {
     hero.innerHTML = `
         <div class="mb-10 relative group">
              <div class="absolute inset-0 bg-primary/20 blur-[100px] rounded-full opacity-40 group-hover:opacity-70 transition-opacity duration-1000"></div>
-             <div class="relative w-24 h-24 md:w-32 md:h-32 bg-teal-900/40 rounded-3xl flex items-center justify-center border border-white/5 overflow-hidden">
+             <div class="relative w-24 h-24 md:w-32 md:h-32 bg-primary/[0.08] rounded-3xl flex items-center justify-center border border-white/5 overflow-hidden">
                 <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" class="text-primary opacity-20 absolute -right-4 -bottom-4">
                     <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
                 </svg>
@@ -102,8 +106,8 @@ export function ImageStudio() {
                 <div class="absolute top-4 right-4 text-primary animate-pulse">✨</div>
              </div>
         </div>
-        <h1 class="text-2xl sm:text-4xl md:text-7xl font-black text-white tracking-widest uppercase mb-4 selection:bg-primary selection:text-black text-center px-4">${t('image.title')}</h1>
-        <p class="text-secondary text-sm font-medium tracking-wide opacity-60">${t('image.subtitle')}</p>
+        <h1 class="text-3xl sm:text-5xl md:text-6xl font-extrabold tracking-tight mb-3 text-center px-4" style="background: linear-gradient(180deg, #fff 30%, rgb(var(--accent) / 0.85)); -webkit-background-clip: text; background-clip: text; color: transparent;">${t('image.title')}</h1>
+        <p class="text-[14px] font-medium text-white/55 text-center px-6">${(isLocalAIAvailable() && isLocalMode()) ? 'Stills on your own GPU. Free, private, works without internet.' : 'Stills on MuAPI cloud models. Pick a model and a look; the price shows before you generate.'}</p>
     `;
     container.appendChild(hero);
 
@@ -176,13 +180,16 @@ export function ImageStudio() {
 
     topRow.appendChild(textarea);
     bar.appendChild(topRow);
+    // Payoff: one-click Looks (style references) under the prompt.
+    const lookRow = createLookRow({ storageKey: 'payoff_look_image' });
+    bar.appendChild(lookRow.el);
 
     // Bottom Row: Controls
     const bottomRow = document.createElement('div');
     bottomRow.className = 'flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 px-2 pt-4 border-t border-white/5';
 
     const controlsLeft = document.createElement('div');
-    controlsLeft.className = 'flex items-center gap-1.5 md:gap-2.5 relative overflow-x-auto no-scrollbar pb-1 md:pb-0';
+    controlsLeft.className = 'flex items-center gap-1.5 md:gap-2.5 relative overflow-x-auto no-scrollbar pb-1 md:pb-0 min-w-0 flex-1';
 
     const createControlBtn = (icon, label, id, tooltip) => {
         const btn = document.createElement('button');
@@ -274,12 +281,28 @@ export function ImageStudio() {
     }
 
     const generateBtn = document.createElement('button');
-    generateBtn.className = 'bg-primary text-black px-6 md:px-8 py-3 md:py-3.5 rounded-xl md:rounded-[1.5rem] font-black text-sm md:text-base hover:shadow-glow hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2.5 w-full sm:w-auto shadow-lg';
+    generateBtn.className = 'bg-primary text-black px-6 md:px-8 py-3 md:py-3.5 rounded-xl md:rounded-[1.5rem] font-black text-sm md:text-base hover:shadow-glow hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2.5 w-full sm:w-auto shadow-lg whitespace-nowrap shrink-0';
     generateBtn.setAttribute('data-tooltip', t('image.generateTooltip'));
     generateBtn.innerHTML = t('common.generate');
 
     bottomRow.appendChild(controlsLeft);
-    bottomRow.appendChild(generateBtn);
+    // Payoff: cost chip (Online) / free chip (Offline) right next to Generate.
+    const costChip = createCostChip();
+    const endpointOf = (id) => ([...t2iModels, ...i2iModels].find(m => m.id === id)?.endpoint) || id;
+    bindCostChip(costChip, () => {
+        const body = { prompt: 'price preview', aspect_ratio: selectedAr };
+        const qf = getCurrentQualityField(selectedModel);
+        const ql = document.getElementById('quality-btn-label')?.textContent;
+        if (qf && ql) body[qf] = ql;
+        if (imageMode) body.image_url = 'https://example.com/ref.png';
+        return { local: useLocalModel, endpoint: endpointOf(selectedModel), body };
+    });
+    if (!useLocalModel) loadAllPrices();
+    const generateGroup = document.createElement('div');
+    generateGroup.className = 'flex items-center justify-end gap-3 shrink-0';
+    generateGroup.appendChild(costChip);
+    generateGroup.appendChild(generateBtn);
+    bottomRow.appendChild(generateGroup);
     bar.appendChild(bottomRow);
     promptWrapper.appendChild(bar);
     container.appendChild(promptWrapper);
@@ -384,121 +407,50 @@ export function ImageStudio() {
     // ==========================================
     // 4. ADVANCED OPTIONS PANEL
     // ==========================================
-    const STYLE_PRESETS = ['None', 'Photorealistic', 'Anime', 'Cinematic', 'Oil Painting', 'Watercolor', 'Digital Art', 'Concept Art', 'Cyberpunk'];
-    
+    // Payoff: Advanced shows only settings that the current mode actually uses.
     const advancedPanel = document.createElement('div');
-    advancedPanel.className = 'w-full max-w-4xl mt-6 animate-fade-in-up hidden';
+    advancedPanel.className = 'w-full max-w-4xl mt-5 animate-fade-in-up hidden';
     advancedPanel.id = 'advanced-panel';
+    const offlineOnly = useLocalModel ? '' : 'hidden';
     advancedPanel.innerHTML = `
-        <div class="bg-[#111]/90 backdrop-blur-xl border border-white/10 rounded-2xl p-5 flex flex-col gap-4">
-            <div class="flex items-center justify-between pb-3 border-b border-white/5">
-                <h3 class="text-sm font-bold text-white">${t('image.advancedOptions')}</h3>
-                <button id="close-adv-btn" class="text-white/40 hover:text-white transition-colors">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
-                </button>
+        <div class="rounded-2xl p-5 flex flex-col gap-4" style="background: rgb(12 12 14 / 0.92); border: 1px solid rgb(255 255 255 / 0.08); backdrop-filter: blur(18px);">
+            <div class="flex items-start justify-between gap-4">
+                <div>
+                    <h3 class="text-[15px] font-bold text-white">Advanced settings</h3>
+                    <p class="pf-help mt-1">${useLocalModel
+                        ? 'Fine-tune the offline model. Defaults are tuned per model, so change one thing at a time.'
+                        : 'Online models pick their own quality settings. Use these to repeat a result you liked.'}</p>
+                </div>
+                <div class="flex items-center gap-2 shrink-0">
+                    <button id="reset-adv-btn" class="pf-chip">Reset</button>
+                    <button id="close-adv-btn" class="pf-chip" aria-label="Close">✕</button>
+                </div>
             </div>
 
-            <!-- Style Presets -->
-            <div class="flex flex-col gap-2">
-                <label class="text-xs font-bold text-secondary uppercase tracking-wider">${t('image.stylePreset')}</label>
-                <div class="flex gap-2 flex-wrap">
-                    ${STYLE_PRESETS.map(s => `<button class="style-preset-btn px-3 py-1.5 rounded-lg text-xs font-bold bg-white/5 text-secondary hover:bg-white/10 transition-all" data-style="${s}">${s}</button>`).join('')}
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div class="pf-section ${offlineOnly}">
+                    <div class="pf-section-title">Avoid in the image</div>
+                    <input type="text" id="negative-prompt-input" class="pf-input" placeholder="e.g. blurry, extra fingers, watermark, text">
+                    <p class="pf-help">Things you don't want to see. Leave empty if the result looks right.</p>
                 </div>
-            </div>
-            
-            <!-- Negative Prompt -->
-            <div class="flex flex-col gap-2">
-                <label class="text-xs font-bold text-secondary uppercase tracking-wider">${t('image.negPromptLabel')}</label>
-                <input type="text" id="negative-prompt-input"
-                    placeholder="${t('image.negPromptPlaceholder')}"
-                    class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm placeholder:text-muted focus:outline-none focus:border-primary/50 transition-colors">
-            </div>
-            
-            <!-- Guidance Scale & Steps Row -->
-            <div class="flex gap-4 flex-wrap">
-                <div class="flex-1 min-w-[200px] flex flex-col gap-2">
+
+                <div class="pf-section ${offlineOnly}">
+                    <div class="flex items-center justify-between"><span class="pf-field-label">Detail passes</span><span id="steps-value" class="pf-value">Auto</span></div>
+                    <input type="range" id="steps-slider" min="1" max="50" step="1" value="25" class="w-full">
+                    <p class="pf-help">Auto uses the model's tuned value (Turbo = 8). More passes = more detail, slower.</p>
+                    <div class="flex items-center justify-between mt-1"><span class="pf-field-label">Follow the prompt</span><span id="guidance-value" class="pf-value">Auto</span></div>
+                    <input type="range" id="guidance-slider" min="1" max="20" step="0.5" value="7.5" class="w-full">
+                    <p class="pf-help">Auto uses the model's tuned value. Higher = sticks closer to your words; too high looks harsh.</p>
+                </div>
+
+                <div class="pf-section md:col-span-2">
                     <div class="flex items-center justify-between">
-                        <label class="text-xs font-bold text-secondary uppercase tracking-wider">${t('image.guidanceScale')}</label>
-                        <span id="guidance-value" class="text-xs font-bold text-primary">7.5</span>
+                        <span class="pf-section-title">Repeat a result (seed)</span>
+                        <button id="randomize-seed-btn" class="pf-chip">New random seed</button>
                     </div>
-                    <input type="range" id="guidance-slider" min="1" max="20" step="0.5" value="7.5" 
-                        class="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-primary">
+                    <input type="number" id="seed-input" class="pf-input" value="-1" placeholder="-1 = random every time">
+                    <p class="pf-help">Same seed + same prompt = the same picture. Keep -1 for a fresh result each time.</p>
                 </div>
-                
-                <div class="flex-1 min-w-[200px] flex flex-col gap-2">
-                    <div class="flex items-center justify-between">
-                        <label class="text-xs font-bold text-secondary uppercase tracking-wider">${t('image.steps')}</label>
-                        <span id="steps-value" class="text-xs font-bold text-primary">25</span>
-                    </div>
-                    <input type="range" id="steps-slider" min="1" max="50" step="1" value="25" 
-                        class="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-primary">
-                </div>
-            </div>
-            
-            <!-- Seed -->
-            <div class="flex flex-col gap-2">
-                <div class="flex items-center justify-between">
-                    <label class="text-xs font-bold text-secondary uppercase tracking-wider">${t('image.seed')}</label>
-                    <button id="randomize-seed-btn" class="text-xs font-bold text-primary hover:text-primary/80 transition-colors">${t('common.randomize')}</button>
-                </div>
-                <input type="number" id="seed-input"
-                    placeholder="${t('image.seedPlaceholder')}"
-                    value="-1"
-                    class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm placeholder:text-muted focus:outline-none focus:border-primary/50 transition-colors">
-            </div>
-            
-            <!-- Batch Count -->
-            <div class="flex flex-col gap-2">
-                <div class="flex items-center justify-between">
-                    <label class="text-xs font-bold text-secondary uppercase tracking-wider">${t('image.batchCount')}</label>
-                    <span id="batch-value" class="text-xs font-bold text-primary">1</span>
-                </div>
-                <input type="range" id="batch-slider" min="1" max="4" step="1" value="1" 
-                    class="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-primary">
-            </div>
-            
-            <!-- Width & Height -->
-            <div class="flex gap-4 flex-wrap">
-                <div class="flex-1 min-w-[120px] flex flex-col gap-2">
-                    <label class="text-xs font-bold text-secondary uppercase tracking-wider">${t('image.width')}</label>
-                    <input type="number" id="width-input"
-                        placeholder="${t('image.widthPlaceholder')}"
-                        value=""
-                        class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm placeholder:text-muted focus:outline-none focus:border-primary/50 transition-colors">
-                </div>
-                <div class="flex-1 min-w-[120px] flex flex-col gap-2">
-                    <label class="text-xs font-bold text-secondary uppercase tracking-wider">${t('image.height')}</label>
-                    <input type="number" id="height-input"
-                        placeholder="${t('image.heightPlaceholder')}"
-                        value=""
-                        class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm placeholder:text-muted focus:outline-none focus:border-primary/50 transition-colors">
-                </div>
-            </div>
-            
-            <!-- Reference Strength (for I2I models) -->
-            <div class="flex flex-col gap-2">
-                <div class="flex items-center justify-between">
-                    <label class="text-xs font-bold text-secondary uppercase tracking-wider">${t('image.refStrength')}</label>
-                    <span id="reference-strength-value" class="text-xs font-bold text-primary">50%</span>
-                </div>
-                <input type="range" id="reference-strength-slider" min="0" max="100" step="5" value="50" 
-                    class="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-primary">
-                <p class="text-xs text-muted">${t('image.refStrengthNote')}</p>
-            </div>
-            
-            <!-- LoRA Model Selection -->
-            <div class="flex flex-col gap-2">
-                <label class="text-xs font-bold text-secondary uppercase tracking-wider">${t('image.lora')}</label>
-                <input type="text" id="lora-input"
-                    placeholder="${t('image.loraPlaceholder')}"
-                    class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm placeholder:text-muted focus:outline-none focus:border-primary/50 transition-colors">
-                <div class="flex items-center gap-2 mt-1">
-                    <label class="text-xs font-bold text-secondary">${t('image.loraWeight')}</label>
-                    <input type="number" id="lora-weight-input" 
-                        value="1.0" min="0" max="4" step="0.1"
-                        class="w-20 bg-white/5 border border-white/10 rounded-xl px-3 py-1.5 text-white text-sm focus:outline-none focus:border-primary/50 transition-colors">
-                </div>
-                <p class="text-xs text-muted">${t('image.loraNote')}</p>
             </div>
         </div>
     `;
@@ -519,6 +471,14 @@ export function ImageStudio() {
     advancedBtn.onclick = toggleAdvanced;
     const closeAdvBtn = advancedPanel.querySelector('#close-adv-btn');
     if (closeAdvBtn) closeAdvBtn.onclick = toggleAdvanced;
+    const resetAdvBtn = advancedPanel.querySelector('#reset-adv-btn');
+    if (resetAdvBtn) resetAdvBtn.onclick = () => {
+        negativePrompt = ''; guidanceScale = 7.5; steps = 25; seed = -1; stepsTouched = false; guidanceTouched = false;
+        const set = (sel, v) => { const el = advancedPanel.querySelector(sel); if (el) el.value = v; };
+        set('#negative-prompt-input', ''); set('#guidance-slider', 7.5); set('#steps-slider', 25); set('#seed-input', -1);
+        const gv = advancedPanel.querySelector('#guidance-value'); if (gv) gv.textContent = 'Auto';
+        const sv = advancedPanel.querySelector('#steps-value'); if (sv) sv.textContent = 'Auto';
+    };
     
     // Quick Tools Panel toggle
     const toggleTools = () => {
@@ -632,6 +592,7 @@ export function ImageStudio() {
     if (guidanceSlider && guidanceValue) {
         guidanceSlider.oninput = (e) => {
             guidanceScale = parseFloat(e.target.value);
+            guidanceTouched = true;
             guidanceValue.textContent = guidanceScale;
         };
     }
@@ -642,6 +603,7 @@ export function ImageStudio() {
     if (stepsSlider && stepsValue) {
         stepsSlider.oninput = (e) => {
             steps = parseInt(e.target.value);
+            stepsTouched = true;
             stepsValue.textContent = steps;
         };
     }
@@ -778,7 +740,7 @@ export function ImageStudio() {
                                     <span class="text-[10px] text-muted">${m.type.toUpperCase()} · ${m.family}</span>
                                 </div>
                             </div>
-                            ${selectedLocalModel === m.id ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFD9A1" stroke-width="4"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
+                            ${selectedLocalModel === m.id ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgb(var(--accent, 34 211 238))" stroke-width="4"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
                         `;
                         item.onclick = (e) => {
                             e.stopPropagation();
@@ -807,7 +769,8 @@ export function ImageStudio() {
                                 <span class="text-xs font-bold text-white tracking-tight">${m.name}</span>
                              </div>
                         </div>
-                        ${selectedModel === m.id ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFD9A1" stroke-width="4"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
+                        <span class="ml-auto mr-2 text-[10.5px] font-semibold text-white/45 tabular-nums">${priceHint(endpointOf(m.id))}</span>
+                        ${selectedModel === m.id ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgb(var(--accent, 34 211 238))" stroke-width="4"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
                     `;
                     item.onclick = (e) => {
                         e.stopPropagation();
@@ -858,7 +821,7 @@ export function ImageStudio() {
                         </div>
                         <span class="text-xs font-bold text-white opacity-80 group-hover:opacity-100 transition-opacity">${r}</span>
                     </div>
-                     ${selectedAr === r ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFD9A1" stroke-width="4"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
+                     ${selectedAr === r ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgb(var(--accent, 34 211 238))" stroke-width="4"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
                 `;
                 item.onclick = (e) => {
                     e.stopPropagation();
@@ -882,7 +845,7 @@ export function ImageStudio() {
                 item.className = 'flex items-center justify-between p-3.5 hover:bg-white/5 rounded-2xl cursor-pointer transition-all group';
                 item.innerHTML = `
                     <span class="text-xs font-bold text-white opacity-80 group-hover:opacity-100">${opt}</span>
-                     ${document.getElementById('quality-btn-label').textContent === opt ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFD9A1" stroke-width="4"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
+                     ${document.getElementById('quality-btn-label').textContent === opt ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgb(var(--accent, 34 211 238))" stroke-width="4"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
                 `;
                 item.onclick = (e) => {
                     e.stopPropagation();
@@ -1158,7 +1121,8 @@ export function ImageStudio() {
     // 5. GENERATION LOGIC
     // ==========================================
     generateBtn.onclick = async () => {
-        const prompt = textarea.value.trim();
+        const rawPrompt = textarea.value.trim();
+        const prompt = rawPrompt ? applyLook(rawPrompt, lookRow.get()) : rawPrompt;
         if (imageMode) {
             if (uploadedImageUrls.length === 0) {
                 alert('Please upload a reference image first.');
@@ -1201,8 +1165,8 @@ export function ImageStudio() {
                     prompt,
                     negative_prompt: negativePrompt || undefined,
                     aspect_ratio: selectedAr,
-                    steps: steps,
-                    guidance_scale: guidanceScale,
+                    steps: stepsTouched ? steps : undefined,
+                    guidance_scale: guidanceTouched ? guidanceScale : undefined,
                     seed,
                 });
                 unsub();
@@ -1284,6 +1248,7 @@ export function ImageStudio() {
                 };
                 const qualityField = getCurrentQualityField(selectedModel);
                 if (qualityField && qualityLabel) genParams[qualityField] = qualityLabel;
+                if (seed !== -1) genParams.seed = seed; // Payoff: Advanced → seed now reaches online models
                 res = await muapi.generateImage(genParams);
             }
 

@@ -7,6 +7,8 @@ import { createUploadPicker } from './UploadPicker.js';
 import { savePendingJob, removePendingJob, getPendingJobs } from '../lib/pendingJobs.js';
 import { localAI, isLocalAIAvailable } from '../lib/localInferenceClient.js';
 import { isLocalMode } from '../lib/appMode.js';
+import { createCostChip, bindCostChip, loadAllPrices, priceHint } from '../lib/pricing.js';
+import { createLookRow, applyLook } from '../lib/payoffLooks.js';
 import { isWan2gpModelId, getLocalModelById, localT2VModels, localI2VModels } from '../lib/localModels.js';
 
 // Promotes a wan2gp catalog entry (lib/localModels.js shape) into the
@@ -109,7 +111,7 @@ export function VideoStudio() {
     hero.innerHTML = `
         <div class="mb-10 relative group">
              <div class="absolute inset-0 bg-primary/20 blur-[100px] rounded-full opacity-40 group-hover:opacity-70 transition-opacity duration-1000"></div>
-             <div class="relative w-24 h-24 md:w-32 md:h-32 bg-teal-900/40 rounded-3xl flex items-center justify-center border border-white/5 overflow-hidden">
+             <div class="relative w-24 h-24 md:w-32 md:h-32 bg-primary/[0.08] rounded-3xl flex items-center justify-center border border-white/5 overflow-hidden">
                 <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" class="text-primary opacity-20 absolute -right-4 -bottom-4">
                     <polygon points="23 7 16 12 23 17 23 7"/>
                     <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
@@ -123,8 +125,8 @@ export function VideoStudio() {
                 <div class="absolute top-4 right-4 text-primary animate-pulse">✨</div>
              </div>
         </div>
-        <h1 class="text-2xl sm:text-4xl md:text-7xl font-black text-white tracking-widest uppercase mb-4 selection:bg-primary selection:text-black text-center px-4">${t('video.title')}</h1>
-        <p class="text-secondary text-sm font-medium tracking-wide opacity-60">${t('video.subtitle')}</p>
+        <h1 class="text-3xl sm:text-5xl md:text-6xl font-extrabold tracking-tight mb-3 text-center px-4" style="background: linear-gradient(180deg, #fff 30%, rgb(var(--accent) / 0.85)); -webkit-background-clip: text; background-clip: text; color: transparent;">${t('video.title')}</h1>
+        <p class="text-[14px] font-medium text-white/55 text-center px-6">${(isLocalAIAvailable() && isLocalMode()) ? 'Clips on your own GPU. Free, private, works without internet.' : 'Clips on MuAPI cloud models. The price shows before you generate.'}</p>
     `;
     container.appendChild(hero);
 
@@ -259,7 +261,7 @@ export function VideoStudio() {
 
     const videoReadyEl = document.createElement('div');
     videoReadyEl.className = 'hidden items-center justify-center w-full h-full';
-    videoReadyEl.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-primary"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/><polyline points="7 10 10 13 15 8" stroke="#FFD9A1" stroke-width="2.5"/></svg>`;
+    videoReadyEl.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-primary"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/><polyline points="7 10 10 13 15 8" stroke="rgb(var(--accent, 34 211 238))" stroke-width="2.5"/></svg>`;
 
     videoPickerBtn.appendChild(videoFileInput);
     videoPickerBtn.appendChild(videoIconEl);
@@ -375,6 +377,9 @@ export function VideoStudio() {
 
     topRow.appendChild(textarea);
     bar.appendChild(topRow);
+    // Payoff: one-click Looks (style references) under the prompt.
+    const lookRow = createLookRow({ storageKey: 'payoff_look_video' });
+    bar.appendChild(lookRow.el);
 
     // Extend mode banner (shown when extend model is active, not editable by user)
     const extendBanner = document.createElement('div');
@@ -390,7 +395,7 @@ export function VideoStudio() {
     bottomRow.className = 'flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 px-2 pt-4 border-t border-white/5';
 
     const controlsLeft = document.createElement('div');
-    controlsLeft.className = 'flex items-center gap-1.5 md:gap-2.5 relative overflow-x-auto no-scrollbar pb-1 md:pb-0';
+    controlsLeft.className = 'flex items-center gap-1.5 md:gap-2.5 relative overflow-x-auto no-scrollbar pb-1 md:pb-0 min-w-0 flex-1';
 
     const createControlBtn = (icon, label, id, tooltip) => {
         const btn = document.createElement('button');
@@ -512,15 +517,95 @@ export function VideoStudio() {
     effectNameBtn.style.display = 'none';
 
     const generateBtn = document.createElement('button');
-    generateBtn.className = 'bg-primary text-black px-6 md:px-8 py-3 md:py-3.5 rounded-xl md:rounded-[1.5rem] font-black text-sm md:text-base hover:shadow-glow hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2.5 w-full sm:w-auto shadow-lg';
+    generateBtn.className = 'bg-primary text-black px-6 md:px-8 py-3 md:py-3.5 rounded-xl md:rounded-[1.5rem] font-black text-sm md:text-base hover:shadow-glow hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2.5 w-full sm:w-auto shadow-lg whitespace-nowrap shrink-0';
     generateBtn.setAttribute('data-tooltip', 'Generate AI video from prompt');
     generateBtn.innerHTML = t('common.generate');
 
     bottomRow.appendChild(controlsLeft);
-    bottomRow.appendChild(generateBtn);
+    // Payoff: cost chip (Online) / free chip (Offline) right next to Generate.
+    const costChip = createCostChip();
+    const endpointOf = (id) => ([...t2vModels, ...i2vModels, ...v2vModels].find(m => m.id === id)?.endpoint) || id;
+    bindCostChip(costChip, () => {
+        const body = { prompt: 'price preview' };
+        if (getCurrentDurations(selectedModel).length > 0) body.duration = selectedDuration;
+        if (getCurrentResolutions(selectedModel).length > 0 && selectedResolution) body.resolution = selectedResolution;
+        if (selectedQuality) body.quality = selectedQuality;
+        if (selectedAr) body.aspect_ratio = selectedAr;
+        return { local: useLocalModel, endpoint: endpointOf(selectedModel), body };
+    });
+    if (!useLocalModel) loadAllPrices();
+    const generateGroup = document.createElement('div');
+    generateGroup.className = 'flex items-center justify-end gap-3 shrink-0';
+    generateGroup.appendChild(costChip);
+    generateGroup.appendChild(generateBtn);
+    bottomRow.appendChild(generateGroup);
     bar.appendChild(bottomRow);
     promptWrapper.appendChild(bar);
     container.appendChild(promptWrapper);
+
+    // Payoff: a real Advanced panel (it used to do nothing). Shows only what the mode uses.
+    let vNegative = '';
+    let vSteps = null;   // null = model default
+    let vSeed = -1;
+    const vAdvanced = document.createElement('div');
+    vAdvanced.className = 'w-full max-w-4xl mt-5 animate-fade-in-up hidden';
+    vAdvanced.innerHTML = (isLocalAIAvailable() && isLocalMode()) ? `
+        <div class="rounded-2xl p-5 flex flex-col gap-4" style="background: rgb(12 12 14 / 0.92); border: 1px solid rgb(255 255 255 / 0.08); backdrop-filter: blur(18px);">
+            <div class="flex items-start justify-between gap-4">
+                <div>
+                    <h3 class="text-[15px] font-bold text-white">Advanced settings</h3>
+                    <p class="pf-help mt-1">Fine-tune the offline video model. Leave a field empty to use the model's tuned default.</p>
+                </div>
+                <div class="flex items-center gap-2 shrink-0"><button data-act="reset" class="pf-chip">Reset</button><button data-act="close" class="pf-chip" aria-label="Close">✕</button></div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div class="pf-section md:col-span-3">
+                    <div class="pf-section-title">Avoid in the video</div>
+                    <input data-f="neg" type="text" class="pf-input" placeholder="e.g. flicker, warped hands, text, watermark">
+                </div>
+                <div class="pf-section">
+                    <div class="pf-field-label">Detail passes</div>
+                    <input data-f="steps" type="number" min="1" max="60" class="pf-input" placeholder="Model default">
+                    <p class="pf-help">Distilled models (LTX) want 8. More = slower.</p>
+                </div>
+                <div class="pf-section md:col-span-2">
+                    <div class="flex items-center justify-between"><span class="pf-field-label">Repeat a result (seed)</span><button data-act="seed" class="pf-chip">New random seed</button></div>
+                    <input data-f="seed" type="number" class="pf-input" value="-1">
+                    <p class="pf-help">Same seed + same prompt = the same clip. -1 = new result each time.</p>
+                </div>
+            </div>
+        </div>` : `
+        <div class="rounded-2xl p-5 flex items-start justify-between gap-4" style="background: rgb(12 12 14 / 0.92); border: 1px solid rgb(255 255 255 / 0.08);">
+            <div>
+                <h3 class="text-[15px] font-bold text-white">Advanced settings</h3>
+                <p class="pf-help mt-1">Online video models manage their own quality settings. Use <b>Duration</b>, <b>Resolution</b> and <b>Quality</b> in the bar above, and a <b>Look</b> for the style. The price next to Generate updates as you change them.</p>
+            </div>
+            <button data-act="close" class="pf-chip shrink-0" aria-label="Close">✕</button>
+        </div>`;
+    container.appendChild(vAdvanced);
+    const vToggle = () => {
+        const open = vAdvanced.classList.toggle('hidden') === false;
+        const lbl = document.getElementById('v-advanced-btn-label');
+        if (lbl) lbl.textContent = open ? 'Less' : 'Advanced';
+    };
+    advancedBtn.onclick = (e) => { e.stopPropagation(); vToggle(); };
+    vAdvanced.addEventListener('click', (e) => {
+        const act = e.target?.dataset?.act;
+        if (act === 'close') vToggle();
+        if (act === 'seed') { vSeed = Math.floor(Math.random() * 2147483647); vAdvanced.querySelector('[data-f="seed"]').value = vSeed; }
+        if (act === 'reset') {
+            vNegative = ''; vSteps = null; vSeed = -1;
+            vAdvanced.querySelector('[data-f="neg"]').value = '';
+            vAdvanced.querySelector('[data-f="steps"]').value = '';
+            vAdvanced.querySelector('[data-f="seed"]').value = -1;
+        }
+    });
+    vAdvanced.addEventListener('input', (e) => {
+        const f = e.target?.dataset?.f;
+        if (f === 'neg') vNegative = e.target.value;
+        if (f === 'steps') vSteps = parseInt(e.target.value, 10) || null;
+        if (f === 'seed') { const n = parseInt(e.target.value, 10); vSeed = Number.isFinite(n) ? n : -1; }
+    });
 
     // Local generation progress + error panel (hidden until a local run starts)
     const localPanel = document.createElement('div');
@@ -716,7 +801,8 @@ export function VideoStudio() {
                             ${localNote}
                          </div>
                     </div>
-                    ${selectedModel === m.id ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFD9A1" stroke-width="4"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
+                    ${m.provider === 'wan2gp' ? '<span class="ml-auto mr-2 text-[10.5px] font-semibold tabular-nums" style="color: rgb(var(--accent))">Free</span>' : `<span class="ml-auto mr-2 text-[10.5px] font-semibold text-white/45 tabular-nums">${priceHint(endpointOf(m.id))}</span>`}
+                    ${selectedModel === m.id ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgb(var(--accent, 34 211 238))" stroke-width="4"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
                 `;
                 item.onclick = (e) => {
                     e.stopPropagation();
@@ -809,7 +895,7 @@ export function VideoStudio() {
                         </div>
                         <span class="text-xs font-bold text-white opacity-80 group-hover:opacity-100 transition-opacity">${r}</span>
                     </div>
-                     ${selectedAr === r ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFD9A1" stroke-width="4"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
+                     ${selectedAr === r ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgb(var(--accent, 34 211 238))" stroke-width="4"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
                 `;
                 item.onclick = (e) => {
                     e.stopPropagation();
@@ -832,7 +918,7 @@ export function VideoStudio() {
                 item.className = 'flex items-center justify-between p-3.5 hover:bg-white/5 rounded-2xl cursor-pointer transition-all group';
                 item.innerHTML = `
                     <span class="text-xs font-bold text-white opacity-80 group-hover:opacity-100">${d}s</span>
-                     ${selectedDuration === d ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFD9A1" stroke-width="4"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
+                     ${selectedDuration === d ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgb(var(--accent, 34 211 238))" stroke-width="4"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
                 `;
                 item.onclick = (e) => {
                     e.stopPropagation();
@@ -854,7 +940,7 @@ export function VideoStudio() {
                 item.className = 'flex items-center justify-between p-3.5 hover:bg-white/5 rounded-2xl cursor-pointer transition-all group';
                 item.innerHTML = `
                     <span class="text-xs font-bold text-white opacity-80 group-hover:opacity-100 capitalize">${q}</span>
-                    ${selectedQuality === q ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFD9A1" stroke-width="4"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
+                    ${selectedQuality === q ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgb(var(--accent, 34 211 238))" stroke-width="4"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
                 `;
                 item.onclick = (e) => {
                     e.stopPropagation();
@@ -877,7 +963,7 @@ export function VideoStudio() {
                 item.className = 'flex items-center justify-between p-3.5 hover:bg-white/5 rounded-2xl cursor-pointer transition-all group';
                 item.innerHTML = `
                     <span class="text-xs font-bold text-white opacity-80 group-hover:opacity-100">${r}</span>
-                     ${selectedResolution === r ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFD9A1" stroke-width="4"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
+                     ${selectedResolution === r ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgb(var(--accent, 34 211 238))" stroke-width="4"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
                 `;
                 item.onclick = (e) => {
                     e.stopPropagation();
@@ -899,7 +985,7 @@ export function VideoStudio() {
                 item.className = 'flex items-center justify-between p-3.5 hover:bg-white/5 rounded-2xl cursor-pointer transition-all group';
                 item.innerHTML = `
                     <span class="text-xs font-bold text-white opacity-80 group-hover:opacity-100 capitalize">${m}</span>
-                    ${selectedMode === m ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFD9A1" stroke-width="4"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
+                    ${selectedMode === m ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgb(var(--accent, 34 211 238))" stroke-width="4"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
                 `;
                 item.onclick = (e) => {
                     e.stopPropagation();
@@ -922,7 +1008,7 @@ export function VideoStudio() {
                 item.className = 'flex items-center justify-between p-3 hover:bg-white/5 rounded-2xl cursor-pointer transition-all group';
                 item.innerHTML = `
                     <span class="text-xs font-bold text-white opacity-80 group-hover:opacity-100">${e}</span>
-                    ${selectedEffectName === e ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFD9A1" stroke-width="4"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
+                    ${selectedEffectName === e ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgb(var(--accent, 34 211 238))" stroke-width="4"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
                 `;
                 item.onclick = (ev) => {
                     ev.stopPropagation();
@@ -1230,7 +1316,8 @@ export function VideoStudio() {
     // 5. GENERATION LOGIC
     // ==========================================
     generateBtn.onclick = async () => {
-        const prompt = textarea.value.trim();
+        const rawPrompt = textarea.value.trim();
+        const prompt = rawPrompt ? applyLook(rawPrompt, lookRow.get()) : rawPrompt;
         const model = getCurrentModel();
         const isExtendMode = model?.requiresRequestId;
 
@@ -1319,6 +1406,9 @@ export function VideoStudio() {
                     prompt: prompt || '',
                     aspect_ratio: selectedAr,
                 };
+                if (vNegative.trim()) localParams.negative_prompt = vNegative.trim();
+                if (vSteps) localParams.steps = vSteps;
+                if (vSeed >= 0) localParams.seed = vSeed;
                 if (imageMode && uploadedImageUrl) localParams.image = uploadedImageUrl;
                 const res = await localAI.generate(localParams);
                 console.log('[VideoStudio] Local response:', res);

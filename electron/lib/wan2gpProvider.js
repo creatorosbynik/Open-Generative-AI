@@ -17,6 +17,7 @@ const { pathToFileURL, fileURLToPath } = require('url');
 const { resolveLocalAiPaths } = require('./localInferencePaths');
 const { withWan2gpAvailability } = require('./wan2gpModelAvailability');
 const { WAN2GP_CATALOG, getModelById, buildWan2gpSettings } = require('./wan2gpCatalog');
+const warm = require('./wan2gpServer');
 const local = require('./wan2gpLocal');
 const { createMcpClient, normalizeMcpUrl } = require('./wan2gpMcp');
 
@@ -42,6 +43,7 @@ function writeConfig(cfg) {
         dir: (cfg.dir || '').trim(),
         python: (cfg.python || '').trim(),
         url: (cfg.url || '').trim().replace(/\/+$/, ''),
+        keepWarm: cfg.keepWarm !== false,
     };
     fs.writeFileSync(CONFIG_FILE, JSON.stringify(next, null, 2));
     return next;
@@ -178,7 +180,22 @@ async function generate(params, mainWindow) {
     send({ status: 'starting', progress: 0 });
 
     try {
-        if (mode === 'local') {
+        // Payoff: prefer the warm local engine (model stays loaded between generations).
+        let mcpUrl = mode === 'remote' ? cfg.url : null;
+        if (mode === 'local' && cfg.keepWarm !== false) {
+            const install = local.resolveInstall(cfg);
+            const installCheck = local.checkInstall(install);
+            if (!installCheck.ok) throw new Error(installCheck.error);
+            try {
+                mcpUrl = await warm.ensureServer(install, (message) => send({ status: 'starting', progress: 0, message }));
+            } catch (err) {
+                console.warn('[wan2gp] warm engine unavailable, falling back to one-off run:', err.message);
+                mcpUrl = null;
+            }
+            if (run.cancelled) throw new Error('Generation cancelled');
+        }
+
+        if (mode === 'local' && !mcpUrl) {
             const install = local.resolveInstall(cfg);
             const installCheck = local.checkInstall(install);
             if (!installCheck.ok) throw new Error(installCheck.error);
@@ -192,7 +209,7 @@ async function generate(params, mainWindow) {
             return mediaResult(mediaPath, settings.seed);
         }
 
-        const client = mcpClientFor(cfg.url);
+        const client = mcpClientFor(mcpUrl);
         const abort = new AbortController();
         let jobId = null;
         run.cancel = () => {
@@ -239,6 +256,7 @@ function register() {
     });
     ipcMain.handle('wan2gp:set-config', (_, cfg) => {
         mcpClients.clear();
+        warm.stopServer();
         return { ok: true, config: writeConfig({ ...readConfig(), ...cfg }) };
     });
     ipcMain.handle('wan2gp:set-url', (_, url) => {
@@ -253,6 +271,17 @@ function register() {
         return res.canceled ? null : res.filePaths[0];
     });
     ipcMain.handle('wan2gp:list-models', () => listModels());
+    // Payoff: start the warm engine in the background (called when Offline mode opens).
+    ipcMain.handle('wan2gp:warm', async () => {
+        const cfg = readConfig();
+        if (engineMode(cfg) !== 'local' || cfg.keepWarm === false) return { ok: false, state: 'off' };
+        const install = local.resolveInstall(cfg);
+        if (!local.checkInstall(install).ok) return { ok: false, state: 'not-installed' };
+        warm.ensureServer(install).catch((err) => console.warn('[wan2gp] warm start failed:', err.message));
+        return { ok: true, state: 'starting' };
+    });
+    ipcMain.handle('wan2gp:engine-state', () => ({ state: warm.serverState() }));
+    app.on('before-quit', () => warm.stopServer());
     ipcMain.handle('wan2gp:generate', (_, params) => generate(params, getMainWindow()));
     ipcMain.handle('wan2gp:cancel-generation', () => cancelGeneration());
     ipcMain.handle('wan2gp:upload-file', (_, payload) => saveInput(payload));

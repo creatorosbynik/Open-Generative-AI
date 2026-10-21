@@ -6,18 +6,22 @@ Our fork of [Open Generative AI](https://github.com/Anil-matcha/Open-Generative-
 
 **The rule:** local first for previz, storyboards and hook tests, because it costs nothing and nothing leaves the PC. Use cloud (MuAPI) only for hero renders on flagship models.
 
-## Cloud / Local switch (desktop app)
+## Online / Offline switch (desktop app)
 
-The desktop app has one switch in the top bar: **☁ Cloud | ⚡ Local**. Switching reloads the app, so the two never mix.
+Top bar: **● Online | ● Offline**, or press **Ctrl+Shift+M**. Switching is instant, with no restart. The whole app changes colour: **blue = Online**, **green = Offline**.
 
-| | ☁ Cloud mode (blue strip) | ⚡ Local mode (green strip) |
+| | Online (blue) | Offline (green) |
 |---|---|---|
-| Models | MuAPI only (Seedance, Veo, Kling, Nano Banana…) | On-device only: Z-Image, SDXL, Realistic Vision, Flux Dev, Qwen Image, Wan 2.1/2.2, LTX-2, Hunyuan |
+| Models | MuAPI only (Seedance, Veo, Kling, Nano Banana…) | On your GPU: Z-Image Turbo, LTX-2.5 (with sound), Wan 2.1/2.2, Flux Dev, Qwen Image… |
 | Studios | Image, Video, Lip Sync, Cinema, Workflows, Agents, MCP | Image, Video |
-| Internet | Yes, needs your MuAPI key | **Blocked for the app window.** Prompts, uploads and outputs never leave the PC. Only model downloads (Settings → Local Models) use the network. |
-| Cost | MuAPI credits | ₹0 per generation |
+| Cost | **Price chip next to Generate**: exact for fixed-price models, "≈" estimate for duration/resolution-priced ones. Prices also show in the model list. | "Free · runs on your GPU" |
+| Internet | Uses your MuAPI key | Blocked for the app window. Only model downloads use the network. |
 
-The web app (`Start-Payoff-Web.bat`) is always Cloud.
+**Looks:** one-click style references under the prompt (Cinematic, Editorial, Product hero, Food commercial, Documentary, UGC phone, Luxury, Desi warmth). Your text stays as you typed it; the look is added when you generate.
+
+**Advanced** shows only settings the current mode actually uses, in plain words: Avoid (negative prompt), Detail passes and Follow the prompt (Auto = the model's tuned value), and Seed (repeat a result).
+
+**Warm engine:** in Offline mode the app keeps Wan2GP running in the background on `127.0.0.1:7866`. The first generation loads the model; the following ones skip the reload. It stops when you close the app.
 
 ## Two apps, one repo
 
@@ -95,5 +99,5 @@ See the change log on the Notion page **PAYOFF → Payoff Studio (Open Generativ
 - Web server and Docker are bound to 127.0.0.1, so other devices on the network can't reach them.
 - The local engine download (sd.cpp) is SHA-256 verified against GitHub's published digest before anything is extracted or run.
 - Added Windows launchers: `Start-Payoff-Web.bat`, `Build-Desktop-App.bat` and `Update-From-Upstream.bat`.
-- Cloud / Local mode switch.
+- Online / Offline mode switch (instant, Ctrl+Shift+M), MuAPI cost chip, Payoff looks and the warm Wan2GP engine.
 - Client build: renamed Payoff Studio (Payoff icon, logo and cream accent), model policy, client projects with provenance records. The app keeps its old settings folder, so the MuAPI key, history and Wan2GP setup carry over. The new installer installs **Payoff Studio** alongside the old "Open Generative AI" app; uninstall the old one once the new one works.

@@ -1,0 +1,111 @@
+/* Payoff Studio theme: one accent per mode.
+   Online (cloud, MuAPI)  → electric blue
+   Offline (local, GPU)   → emerald
+   Every `primary` utility, glow and checkmark reads --accent, so the whole UI
+   recolours the moment the mode changes. */
+:root,
+:root[data-mode="cloud"] {
+  --accent: 96 165 250;          /* #60A5FA */
+  --accent-strong: 59 130 246;   /* #3B82F6 */
+  --accent-soft: 30 58 138;      /* #1E3A8A */
+  --mode-label: "Online";
+}
+
+:root[data-mode="local"] {
+  --accent: 52 211 153;          /* #34D399 */
+  --accent-strong: 16 185 129;   /* #10B981 */
+  --accent-soft: 6 78 59;        /* #064E3B */
+  --mode-label: "Offline";
+}
+
+/* Colour changes glide instead of snapping. */
+body, body * {
+  transition-property: background-color, border-color, color, fill, stroke, box-shadow;
+  transition-duration: 220ms;
+  transition-timing-function: ease;
+}
+/* …but never animate layout-heavy elements or media. */
+video, img, canvas, input[type="range"] { transition: none; }
+
+/* A quiet mode-tinted glow behind the studios. */
+#content-area {
+  background:
+    radial-gradient(1200px 520px at 50% -10%, rgb(var(--accent) / 0.10), transparent 60%),
+    radial-gradient(800px 400px at 100% 110%, rgb(var(--accent-soft) / 0.18), transparent 60%),
+    #050506;
+}
+
+/* Typography: tighter, calmer headings. */
+h1, h2, h3 { letter-spacing: -0.02em; }
+
+/* Focus ring that follows the mode. */
+:focus-visible {
+  outline: 2px solid rgb(var(--accent) / 0.7);
+  outline-offset: 2px;
+  border-radius: 10px;
+}
+
+/* Range sliders tinted to the mode. */
+input[type="range"] { accent-color: rgb(var(--accent)); }
+
+/* ---- Payoff UI kit ---------------------------------------------------- */
+.pf-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 30px; padding: 0 12px; border-radius: 999px;
+  font-size: 12px; font-weight: 600; white-space: nowrap;
+  color: rgb(255 255 255 / 0.62);
+  background: rgb(255 255 255 / 0.04);
+  border: 1px solid rgb(255 255 255 / 0.08);
+  cursor: pointer;
+}
+.pf-chip:hover { color: #fff; background: rgb(255 255 255 / 0.08); }
+.pf-chip[aria-pressed="true"] {
+  color: rgb(var(--accent));
+  background: rgb(var(--accent) / 0.12);
+  border-color: rgb(var(--accent) / 0.45);
+}
+
+.pf-cost {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 30px; padding: 0 12px; border-radius: 999px;
+  font-size: 12px; font-weight: 700; white-space: nowrap;
+  color: rgb(var(--accent));
+  background: rgb(var(--accent) / 0.10);
+  border: 1px solid rgb(var(--accent) / 0.30);
+  font-variant-numeric: tabular-nums;
+}
+.pf-cost[data-state="free"] { color: rgb(52 211 153); background: rgb(52 211 153 / 0.10); border-color: rgb(52 211 153 / 0.30); }
+.pf-cost[data-state="unknown"] { color: rgb(255 255 255 / 0.5); background: rgb(255 255 255 / 0.04); border-color: rgb(255 255 255 / 0.10); }
+
+.pf-section { display: flex; flex-direction: column; gap: 10px; padding: 16px; border-radius: 16px;
+  background: rgb(255 255 255 / 0.025); border: 1px solid rgb(255 255 255 / 0.06); }
+.pf-section-title { font-size: 12px; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 8px; }
+.pf-help { font-size: 11.5px; line-height: 1.45; color: rgb(255 255 255 / 0.45); }
+.pf-field-label { font-size: 12px; font-weight: 600; color: rgb(255 255 255 / 0.78); }
+.pf-value { font-size: 12px; font-weight: 700; color: rgb(var(--accent)); font-variant-numeric: tabular-nums; }
+.pf-input {
+  width: 100%; height: 38px; padding: 0 12px; border-radius: 10px;
+  background: rgb(255 255 255 / 0.04); border: 1px solid rgb(255 255 255 / 0.10);
+  color: #fff; font-size: 13px;
+}
+.pf-input:focus { outline: none; border-color: rgb(var(--accent) / 0.6); }
+
+/* Mode switch */
+.pf-mode-switch { position: relative; display: inline-flex; padding: 3px; border-radius: 12px;
+  background: rgb(255 255 255 / 0.05); border: 1px solid rgb(255 255 255 / 0.10); }
+.pf-mode-switch button { position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 7px;
+  height: 32px; padding: 0 14px; border-radius: 9px; font-size: 12.5px; font-weight: 700; color: rgb(255 255 255 / 0.55); }
+.pf-mode-switch button:hover { color: #fff; }
+.pf-mode-switch button[aria-pressed="true"] { color: #04110c; background: rgb(var(--accent)); box-shadow: 0 0 18px rgb(var(--accent) / 0.35); }
+.pf-mode-dot { width: 7px; height: 7px; border-radius: 99px; background: currentColor; }
+
+/* Toast */
+.pf-toast { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); z-index: 9999;
+  display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-radius: 12px;
+  background: rgb(10 10 12 / 0.92); border: 1px solid rgb(var(--accent) / 0.4);
+  color: #fff; font-size: 13px; font-weight: 600; box-shadow: 0 10px 40px rgb(0 0 0 / 0.5), 0 0 24px rgb(var(--accent) / 0.2);
+  animation: pf-toast-in 220ms ease-out; }
+@keyframes pf-toast-in { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
+
+details.pf-details > summary { list-style: none; cursor: pointer; }
+details.pf-details > summary::-webkit-details-marker { display: none; }

@@ -208,4 +208,5 @@ module.exports = {
     localModelStatus,
     resolveInstall,
     runGeneration,
+    spawnWgp,
 };

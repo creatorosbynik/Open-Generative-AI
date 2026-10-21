@@ -4,6 +4,7 @@ const { register: registerLocalInference } = require('./lib/localInference');
 const { register: registerWan2gp } = require('./lib/wan2gpProvider');
 const { register: registerPayoffMode, getMode: getPayoffMode } = require('./lib/payoffMode');
 const { register: registerPayoffProjects } = require('./lib/payoffProjects');
+const { register: registerPricing } = require('./lib/muapiPricing');
 
 // Payoff Studio keeps the settings folder of the app it grew out of, so the
 // MuAPI key, history, Wan2GP setup, downloaded weights and mode carry over.
@@ -77,6 +78,7 @@ app.whenReady().then(() => {
     // Payoff: mode must be known (and the offline guard installed) before the UI loads.
     registerPayoffMode();
     registerPayoffProjects({ getMode: getPayoffMode });
+    registerPricing();
     createWindow();
 
     try {

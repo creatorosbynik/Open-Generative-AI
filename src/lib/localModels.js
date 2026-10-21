@@ -19,7 +19,7 @@ export const LOCAL_MODEL_CATALOG = [
     },
     {
         id: 'wan2gp:ltx25-distilled-nvfp4',
-        name: 'LTX-2.5 Distilled NVFP4 (video + sound)',
+        name: 'LTX-2.5 (with sound)',
         description: 'Video — LTX-2.5 22B distilled, 8 steps, 720p, generates synced audio. NVFP4 for RTX 50-series. Already on disk.',
         type: 'video',
         family: 'ltx',

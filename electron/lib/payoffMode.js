@@ -2,9 +2,10 @@
 //   cloud — MuAPI models only (needs an API key, uses the internet)
 //   local — on-device models only (sd.cpp + Wan2GP); the app window is cut
 //           off from the internet so nothing (prompts, uploads, outputs) leaves this PC.
+// Switching is instant (no window reload).
 // Model downloads and the local engines run in the main process / child
 // processes, so they are not affected by the renderer block.
-const { app, ipcMain, session, BrowserWindow } = require('electron');
+const { app, ipcMain, session } = require('electron');
 const fs = require('fs');
 const path = require('path');
 
@@ -61,8 +62,8 @@ function register() {
     ipcMain.handle('payoff-mode:set', (event, next) => {
         if (!MODES.includes(next)) throw new Error(`Unknown mode: ${next}`);
         save(next);
-        const win = BrowserWindow.fromWebContents(event.sender);
-        if (win) setImmediate(() => win.webContents.reload());
+        // Payoff: no reload. The renderer swaps the studios in place; the network
+        // guard reads `mode` on every request, so it takes effect immediately.
         return mode;
     });
 }

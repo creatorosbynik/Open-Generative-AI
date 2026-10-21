@@ -9,11 +9,11 @@ export function ProjectPicker() {
 
     const pill = document.createElement('button');
     pill.type = 'button';
-    pill.className = 'flex items-center gap-2 rounded-lg border px-3 py-1 text-[12px] font-bold transition-colors max-w-[280px]';
+    pill.className = 'flex items-center gap-2 h-9 rounded-lg border px-3 text-[12px] font-bold transition-colors max-w-[280px]';
 
     const paint = (s) => {
         const set = !!(s?.client && s?.project);
-        pill.className = `flex items-center gap-2 rounded-lg border px-3 py-1 text-[12px] font-bold transition-colors max-w-[280px] ${
+        pill.className = `flex items-center gap-2 h-9 rounded-lg border px-3 text-[12px] font-bold transition-colors max-w-[280px] ${
             set ? 'border-primary/40 bg-primary/10 text-primary hover:bg-primary/20' : 'border-amber-400/50 bg-amber-400/10 text-amber-300 hover:bg-amber-400/20'}`;
         pill.innerHTML = set
             ? `<span aria-hidden="true">▣</span><span class="truncate">${esc(s.client)} / ${esc(s.project)}</span>`
