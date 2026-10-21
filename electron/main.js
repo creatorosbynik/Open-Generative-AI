@@ -3,6 +3,7 @@ const path = require('path');
 const { register: registerLocalInference } = require('./lib/localInference');
 const { register: registerWan2gp } = require('./lib/wan2gpProvider');
 const { register: registerPayoffMode } = require('./lib/payoffMode');
+const { register: registerPricing } = require('./lib/muapiPricing');
 
 process.on('uncaughtException', (err) => {
     console.error('Uncaught exception:', err);
@@ -71,6 +72,7 @@ function createWindow() {
 app.whenReady().then(() => {
     // Payoff: mode must be known (and the offline guard installed) before the UI loads.
     registerPayoffMode();
+    registerPricing();
     createWindow();
 
     try {

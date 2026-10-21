@@ -28,6 +28,8 @@ contextBridge.exposeInMainWorld('localAI', {
         generate:   (params) => ipcRenderer.invoke('wan2gp:generate', params),
         cancelGeneration: () => ipcRenderer.invoke('wan2gp:cancel-generation'),
         uploadFile: (payload) => ipcRenderer.invoke('wan2gp:upload-file', payload),
+        warm:       () => ipcRenderer.invoke('wan2gp:warm'),
+        engineState: () => ipcRenderer.invoke('wan2gp:engine-state'),
     },
 
     // Progress events — both engines emit on local-ai:progress
@@ -47,4 +49,10 @@ contextBridge.exposeInMainWorld('localAI', {
 contextBridge.exposeInMainWorld('payoffMode', {
     get: () => ipcRenderer.sendSync('payoff-mode:get'),
     set: (mode) => ipcRenderer.invoke('payoff-mode:set', mode),
+});
+
+// Payoff Studio: MuAPI prices for the cost chip (fetched in the main process).
+contextBridge.exposeInMainWorld('payoffPricing', {
+    price: (endpoint, body) => ipcRenderer.invoke('pricing:price', endpoint, body),
+    all: () => ipcRenderer.invoke('pricing:all'),
 });

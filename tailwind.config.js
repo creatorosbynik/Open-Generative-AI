@@ -13,9 +13,10 @@ module.exports = {
     theme: {
         extend: {
             colors: {
+                // Payoff: accent follows the Online / Offline mode (see src/styles/theme.css).
                 primary: {
-                    DEFAULT: '#22d3ee',
-                    hover: '#06b6d4',
+                    DEFAULT: 'rgb(var(--accent, 34 211 238) / <alpha-value>)',
+                    hover: 'rgb(var(--accent-strong, 6 182 212) / <alpha-value>)',
                 },
                 'app-bg': '#050505',
                 'panel-bg': '#0a0a0a',
@@ -24,7 +25,7 @@ module.exports = {
                 muted: '#52525b',
             },
             fontFamily: {
-                sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+                sans: ['Inter', '"Segoe UI Variable Text"', '"Segoe UI"', 'system-ui', '-apple-system', 'sans-serif'],
             },
             borderRadius: {
                 'xl': '1rem',
@@ -32,7 +33,8 @@ module.exports = {
                 '3xl': '2rem',
             },
             boxShadow: {
-                'glow': '0 0 20px rgba(34, 211, 238, 0.4)',
+                'glow': '0 0 24px rgb(var(--accent, 34 211 238) / 0.35)',
+                'glow-sm': '0 0 12px rgb(var(--accent, 34 211 238) / 0.35)',
                 'glow-accent': '0 0 20px rgba(168, 85, 247, 0.4)',
                 '3xl': '0 35px 60px -15px rgba(0, 0, 0, 0.8)',
             }
