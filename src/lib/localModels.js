@@ -1,3 +1,4 @@
+import { applyPolicyInPlace } from 'studio/src/payoffPolicy.js';
 // Frontend-side local model catalog.
 // Two providers:
 //   - sdcpp: bundled engine, weights live on disk
@@ -124,17 +125,7 @@ export const LOCAL_MODEL_CATALOG = [
 
     // ── Wan2GP: image models ────────────────────────────────────────────────
     // modelType = WanGP model_type (<Wan2GP>/defaults/<modelType>.json)
-    {
-        id: 'wan2gp:flux-dev',
-        name: 'Flux.1 Dev (Wan2GP)',
-        description: 'Image — FLUX.1 dev (12B) served by Wan2GP.',
-        type: 'image',
-        family: 'flux',
-        provider: 'wan2gp',
-        modelType: 'flux',
-        aspectRatios: ['1:1', '4:3', '3:4', '16:9', '9:16'],
-        tags: ['image', 'flux'],
-    },
+    // Payoff: FLUX.1 [dev] removed: its weights are licensed for non-commercial use only.
     {
         id: 'wan2gp:qwen-image',
         name: 'Qwen Image (Wan2GP)',
@@ -204,6 +195,9 @@ export const LOCAL_MODEL_CATALOG = [
         tags: ['video', 'ltx', 'fast'],
     },
 ];
+
+// Payoff: tag every local model with its policy tier (and drop any blocked one).
+applyPolicyInPlace(LOCAL_MODEL_CATALOG);
 
 export function getLocalModelById(id) {
     return LOCAL_MODEL_CATALOG.find(m => m.id === id) || null;

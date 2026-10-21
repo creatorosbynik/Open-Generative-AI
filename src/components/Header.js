@@ -1,4 +1,5 @@
 import { SettingsModal } from './SettingsModal.js';
+import { ProjectPicker } from './ProjectPicker.js';
 import { t, getLang, setLang } from '../lib/i18n.js';
 import { getMode, setMode, canSwitchMode, LOCAL_PAGES } from '../lib/appMode.js';
 
@@ -29,13 +30,11 @@ export function Header(navigate) {
     // Logo
     const logoContainer = document.createElement('div');
     logoContainer.className = 'cursor-pointer hover:scale-110 transition-transform';
+    logoContainer.title = 'Payoff Studio';
     logoContainer.innerHTML = `
-        <div class="w-8 h-8 bg-white rounded-lg flex items-center justify-center p-1.5 shadow-lg">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="black"/>
-                <path d="M2 17L12 22L22 17" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M2 12L12 17L22 12" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
+        <div class="flex items-center gap-2">
+            <img src="./payoff-logo-white.png" alt="Payoff" class="h-5 w-auto select-none" draggable="false" />
+            <span class="text-[10px] font-black tracking-[0.25em] text-primary/80 uppercase">Studio</span>
         </div>
     `;
 
@@ -99,6 +98,10 @@ export function Header(navigate) {
     langBtn.title = currentLang === 'zh-CN' ? t('web.switchToEn') : t('web.switchToZh');
     langBtn.textContent = currentLang === 'zh-CN' ? 'EN' : '中文';
     langBtn.onclick = () => setLang(currentLang === 'zh-CN' ? 'en' : 'zh-CN');
+
+    // Payoff: active client project (desktop app only). Outputs are filed there.
+    const projectPill = ProjectPicker();
+    if (projectPill) rightPart.appendChild(projectPill);
 
     // Payoff: Cloud / Local switch (desktop app only). Switching reloads the app
     // so the two model worlds never mix.

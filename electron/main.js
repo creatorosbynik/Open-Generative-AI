@@ -2,12 +2,17 @@ const { app, BrowserWindow, shell, dialog } = require('electron');
 const path = require('path');
 const { register: registerLocalInference } = require('./lib/localInference');
 const { register: registerWan2gp } = require('./lib/wan2gpProvider');
-const { register: registerPayoffMode } = require('./lib/payoffMode');
+const { register: registerPayoffMode, getMode: getPayoffMode } = require('./lib/payoffMode');
+const { register: registerPayoffProjects } = require('./lib/payoffProjects');
+
+// Payoff Studio keeps the settings folder of the app it grew out of, so the
+// MuAPI key, history, Wan2GP setup, downloaded weights and mode carry over.
+app.setPath('userData', path.join(app.getPath('appData'), 'Open Generative AI'));
 
 process.on('uncaughtException', (err) => {
     console.error('Uncaught exception:', err);
     try {
-        dialog.showErrorBox('Open Generative AI — Unexpected Error', err && err.stack ? err.stack : String(err));
+        dialog.showErrorBox('Payoff Studio: unexpected error', err && err.stack ? err.stack : String(err));
     } catch (_) {
         // dialog unavailable this early; the console log above is the fallback
     }
@@ -71,6 +76,7 @@ function createWindow() {
 app.whenReady().then(() => {
     // Payoff: mode must be known (and the offline guard installed) before the UI loads.
     registerPayoffMode();
+    registerPayoffProjects({ getMode: getPayoffMode });
     createWindow();
 
     try {
@@ -80,7 +86,7 @@ app.whenReady().then(() => {
         console.error('Failed to register local-ai/wan2gp handlers:', err);
         dialog.showErrorBox(
             'Local AI features unavailable',
-            `Open Generative AI started, but local model support failed to initialize:\n\n${err.message}`
+            `Payoff Studio started, but local model support failed to initialize:\n\n${err.message}`
         );
     }
 

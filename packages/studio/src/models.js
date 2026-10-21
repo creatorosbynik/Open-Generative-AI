@@ -1,3 +1,4 @@
+import { applyPolicyInPlace } from "./payoffPolicy.js";
 import { getMediaCapability } from "./modelCapabilities.js";
 
 // Synced from the canonical Muapi schema_data.json catalog.
@@ -83,7 +84,7 @@ const GROK_IMAGE_INPUT = Object.freeze({
 });
 const GROK_STYLE_INPUT = Object.freeze({
   type: "string", title: "Style", name: "mode", configurable: true,
-  enum: Object.freeze(["normal", "fun", "spicy"]), default: "normal",
+  enum: Object.freeze(["normal", "fun"]), default: "normal", // Payoff: "spicy" mode removed
 });
 const MINIMAX_H3_OPEN_SEED_INPUT = Object.freeze({
   type: "integer",
@@ -35144,3 +35145,11 @@ export const audioModels = [
 ];
 
 export const getAudioModelById = (id) => audioModels.find(m => m.id === id);
+
+// ── Payoff Studio model policy ─────────────────────────────────────────────
+// Removes blocked routes and tags every model as cleared-for-finals or previz.
+// Runs last, so the derived lists above are pruned too. See payoffPolicy.js.
+for (const list of [t2iModels, i2iModels, t2vModels, i2vModels, v2vModels, lipsyncModels,
+    imageLipSyncModels, videoLipSyncModels, recastModels, motionControlModels, audioModels]) {
+  applyPolicyInPlace(list);
+}

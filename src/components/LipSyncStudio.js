@@ -1,4 +1,5 @@
 import { muapi } from '../lib/muapi.js';
+import { recordAsset } from '../lib/payoffProjects.js';
 import { lipsyncModels, imageLipSyncModels, videoLipSyncModels, getLipSyncModelById, getResolutionsForLipSyncModel } from '../lib/models.js';
 import { AuthModal } from './AuthModal.js';
 import { t } from '../lib/i18n.js';
@@ -530,6 +531,7 @@ export function LipSyncStudio() {
 
     const addToHistory = (entry) => {
         generationHistory.unshift(entry);
+        recordAsset('lipsync', entry); // Payoff: file it in the active project with provenance
         localStorage.setItem('lipsync_history', JSON.stringify(generationHistory.slice(0, 30)));
         historySidebar.classList.remove('translate-x-full', 'opacity-0');
         historySidebar.classList.add('translate-x-0', 'opacity-100');

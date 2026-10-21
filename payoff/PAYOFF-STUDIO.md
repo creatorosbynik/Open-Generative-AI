@@ -1,6 +1,8 @@
 # Payoff Studio
 
-Our fork of [Open Generative AI](https://github.com/Anil-matcha/Open-Generative-AI), set up for Payoff's production work.
+Our fork of [Open Generative AI](https://github.com/Anil-matcha/Open-Generative-AI), rebuilt as Payoff's brand-safe production tool.
+
+**Branches:** `payoff-client` is the clean client build (this guide). `payoff-studio` is the earlier personal build.
 
 **The rule:** local first for previz, storyboards and hook tests, because it costs nothing and nothing leaves the PC. Use cloud (MuAPI) only for hero renders on flagship models.
 
@@ -26,7 +28,7 @@ The web app (`Start-Payoff-Web.bat`) is always Cloud.
 | Models | Cloud only, using your MuAPI key | Cloud **plus local GPU** (sd.cpp + Wan2GP) |
 | Use it for | Flagship finals: Seedance, Veo, Kling, Nano Banana Pro | Previz, animatics, hook variants, NDA work |
 
-## First-time setup (Windows, RTX 5080)
+## First-time setup (Windows, RTX 5060 Ti 16 GB)
 
 1. Install **Node.js 22 LTS** and **Git for Windows**.
 2. Clone our fork in GitHub Desktop: File → Clone repository → `creatorosbynik/Open-Generative-AI`. Use `C:\Payoff\Studio` as the local path.
@@ -60,11 +62,30 @@ Starting models for 16 GB VRAM:
 - Before a batch of flagship video, check the price on the model's page. Flagship clips cost far more than fast or lite variants.
 - Before cutting Higgsfield, compare cost per *usable* shot between Higgsfield and Payoff Studio for 2 weeks.
 
-## Brand-safety and client rules
+## Model policy (client build)
 
-- The Spicy and no-filter routes are kept in this build by choice. **Never use them for client work or anything carrying a client brand.**
-- Confidential client assets (unreleased products, founder faces) go **local only**. Anything sent to cloud models is uploaded to MuAPI's storage.
-- Before using any cloud output commercially, check MuAPI's terms for that model.
+`packages/studio/src/payoffPolicy.js` decides every model's status. Policy version: 21 Oct 2026.
+
+| Status | What it means | Today |
+|---|---|---|
+| Blocked | Removed from the app | 42 Spicy routes, Grok "spicy" mode, 3 Midjourney routes (no official API; its terms ban automated access), local FLUX.1 [dev] (non-commercial weights) |
+| Cleared for finals | Terms reviewed; usable in client deliverables | Google (Veo, Imagen, Nano Banana, Gemini, Lyria) and OpenAI (GPT Image, Sora) via MuAPI; local Z-Image, Wan 2.1/2.2, Qwen-Image (Apache-2.0), LTX-2/2.5 (free under USD 10M revenue), SDXL base |
+| Previz only | Terms not reviewed yet. Name ends in "· previz only" | Everything else |
+
+To clear a new model: read its maker's terms, add a rule with its licence and basis, bump `POLICY_VERSION`, and log it on the Notion page.
+
+## Client projects and provenance (desktop app)
+
+1. Click the project pill in the top bar and pick **Client** and **Project**. Default folder: `H:\Payoff\Clients`.
+2. Every finished image, video, cinema shot or lip-sync is saved to `<Client>\<Project>\ai-assets\`.
+3. Each file gets a `.provenance.json` next to it: model, maker, licence, cleared or previz, prompt, seed, reference images, whether data left the PC, SHA-256 and the "Made with AI" disclosure. `_provenance.jsonl` in the same folder is the whole project's log, ready for the delivery sheet.
+4. An amber pill means no project is set, so outputs are not being filed.
+
+## Client rules
+
+- Only assets whose record says `"clientDeliverable": true` go into client deliverables. Previz assets stay internal.
+- Confidential client assets (unreleased products, faces) go **local only**. MuAPI's terms have no confidentiality clause.
+- Every AI-assisted asset that reaches the public carries the disclosure label.
 
 ## What we changed vs upstream
 
@@ -74,3 +95,5 @@ See the change log on the Notion page **PAYOFF → Payoff Studio (Open Generativ
 - Web server and Docker are bound to 127.0.0.1, so other devices on the network can't reach them.
 - The local engine download (sd.cpp) is SHA-256 verified against GitHub's published digest before anything is extracted or run.
 - Added Windows launchers: `Start-Payoff-Web.bat`, `Build-Desktop-App.bat` and `Update-From-Upstream.bat`.
+- Cloud / Local mode switch.
+- Client build: renamed Payoff Studio (Payoff icon, logo and cream accent), model policy, client projects with provenance records. The app keeps its old settings folder, so the MuAPI key, history and Wan2GP setup carry over. The new installer installs **Payoff Studio** alongside the old "Open Generative AI" app; uninstall the old one once the new one works.

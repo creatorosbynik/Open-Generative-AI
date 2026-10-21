@@ -48,3 +48,13 @@ contextBridge.exposeInMainWorld('payoffMode', {
     get: () => ipcRenderer.sendSync('payoff-mode:get'),
     set: (mode) => ipcRenderer.invoke('payoff-mode:set', mode),
 });
+
+// Payoff Studio: client projects on disk + provenance records.
+contextBridge.exposeInMainWorld('payoffProjects', {
+    get:          () => ipcRenderer.invoke('payoff-projects:get'),
+    listProjects: (client) => ipcRenderer.invoke('payoff-projects:list-projects', client),
+    set:          (cfg) => ipcRenderer.invoke('payoff-projects:set', cfg),
+    pickRoot:     () => ipcRenderer.invoke('payoff-projects:pick-root'),
+    open:         () => ipcRenderer.invoke('payoff-projects:open'),
+    record:       (info) => ipcRenderer.invoke('payoff-projects:record', info),
+});

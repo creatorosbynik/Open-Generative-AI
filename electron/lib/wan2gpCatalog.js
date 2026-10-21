@@ -44,18 +44,7 @@ const WAN2GP_CATALOG = [
         aspectRatios: ['16:9', '9:16', '1:1'],
         tags: ['video', 'wan', 'text-to-video', 'on-disk'],
     },
-    {
-        id: 'wan2gp:flux-dev',
-        name: 'Flux.1 Dev (Wan2GP)',
-        description: 'Image — FLUX.1 dev (12B) served by Wan2GP.',
-        type: 'image',
-        family: 'flux',
-        provider: 'wan2gp',
-        modelType: 'flux',
-        resolutions: RES_IMAGE,
-        aspectRatios: ['1:1', '4:3', '3:4', '16:9', '9:16'],
-        tags: ['image', 'flux'],
-    },
+    // Payoff: FLUX.1 [dev] removed: its weights are licensed for non-commercial use only.
     {
         id: 'wan2gp:qwen-image',
         name: 'Qwen Image (Wan2GP)',

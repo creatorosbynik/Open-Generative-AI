@@ -67,7 +67,7 @@ test('buildWan2gpSettings picks a random seed when none or -1 is given', () => {
 });
 
 test('buildWan2gpSettings never sends frame counts to image models', () => {
-    const settings = buildWan2gpSettings(getModelById('wan2gp:flux-dev'), { prompt: 'x', video_length: 81, aspect_ratio: '1:1', seed: 3 });
+    const settings = buildWan2gpSettings(getModelById('wan2gp:qwen-image'), { prompt: 'x', video_length: 81, aspect_ratio: '1:1', seed: 3 });
     assert.equal(settings.video_length, undefined);
     assert.equal(settings.resolution, '1024x1024');
 });
@@ -79,4 +79,8 @@ test('buildWan2gpSettings passes the start frame as image_start and requires it 
     const settings = buildWan2gpSettings(i2v, { prompt: 'x', seed: 1 }, { imageStart: '/tmp/start.png' });
     assert.equal(settings.image_start, '/tmp/start.png');
     assert.equal(settings.model_type, 'i2v_2_2');
+});
+
+test('Payoff: FLUX.1 [dev] is not offered (non-commercial weights licence)', () => {
+    assert.equal(getModelById('wan2gp:flux-dev'), null);
 });

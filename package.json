@@ -1,6 +1,6 @@
 {
   "name": "open-generative-ai",
-  "description": "Open-source alternative to HF AI \u2014 AI image, video, cinema and lip sync studio",
+  "description": "Payoff Studio: brand-safe AI image and video production for Payoff, a story-led creative agency",
   "homepage": "https://github.com/Anil-matcha/Open-Generative-AI",
   "private": true,
   "version": "2.0.0",
@@ -38,9 +38,9 @@
     "payoff:web": "npm run build && npm run start"
   },
   "build": {
-    "appId": "ai.generative.open",
-    "productName": "Open Generative AI",
-    "copyright": "Copyright \u00a9 2025",
+    "appId": "com.payoffcreative.studio",
+    "productName": "Payoff Studio",
+    "copyright": "Copyright © 2026 Payoff",
     "directories": {
       "output": "release"
     },
@@ -60,7 +60,7 @@
     ],
     "mac": {
       "category": "public.app-category.graphics-design",
-      "icon": "public/banner.png",
+      "icon": "build/payoff-icon.png",
       "gatekeeperAssess": false,
       "target": [
         {
@@ -73,7 +73,7 @@
       ]
     },
     "win": {
-      "icon": "public/banner.png",
+      "icon": "build/payoff-icon.png",
       "signAndEditExecutable": false,
       "target": [
         {
@@ -90,9 +90,9 @@
       "include": "build/installer.nsh"
     },
     "linux": {
-      "icon": "public/banner.png",
+      "icon": "build/payoff-icon.png",
       "category": "Utility",
-      "maintainer": "Open Generative AI Team",
+      "maintainer": "Payoff <hello@payoffcreative.com>",
       "extraFiles": [
         {
           "from": "build/linux/apparmor.profile",
@@ -146,5 +146,6 @@
     "refractor": {
       "prismjs": "^1.30.0"
     }
-  }
+  },
+  "productName": "Payoff Studio"
 }
